@@ -42,7 +42,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <memory>
 
-
 class SpellBook;
 class QUndoStack;
 
@@ -273,6 +272,7 @@ public:
 	bool inherits( const QString & name, const QStringList & ancestors ) const;
 	// returns true if the block containing index inherits ancestor
 	bool inherits( const QModelIndex & index, const QString & ancestor ) const;
+	bool inherits( const QModelIndex & index, const QStringList & ancestors ) const;
 
 	//! Is this version supported?
 	static bool isVersionSupported( quint32 );
@@ -284,7 +284,7 @@ public:
 	bool checkVersion( quint32 since, quint32 until ) const;
 
 	quint32 getUserVersion() const { return get<int>( getHeader(), "User Version" ); }
-	quint32 getUserVersion2() const { return get<int>( getHeader(), "User Version 2" ); }
+	quint32 getUserVersion2() const { return get<int>( getItem( getHeaderItem(), "BS Header" ), "BS Version" ); }
 
 	QString string( const QModelIndex & index, bool extraInfo = false ) const;
 	QString string( const QModelIndex & index, const QString & name, bool extraInfo = false ) const;
@@ -320,7 +320,7 @@ protected:
 
 	bool evalVersion( NifItem * item, bool chkParents = false ) const override final;
 
-	bool setHeaderString( const QString & ) override final;
+	bool setHeaderString( const QString &, uint ver = 0 ) override final;
 
 	template <typename T> T get( NifItem * parent, const QString & name ) const;
 	template <typename T> T get( NifItem * item ) const;

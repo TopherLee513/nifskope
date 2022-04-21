@@ -63,11 +63,12 @@ void NifIStream::init()
 
 bool NifIStream::read( NifValue & val )
 {
+	if ( val.isCount() )
+		val.val.u64 = 0;
+
 	switch ( val.type() ) {
 	case NifValue::tBool:
 		{
-			val.val.u32 = 0;
-
 			if ( bool32bit )
 				*dataStream >> val.val.u32;
 			else
@@ -77,7 +78,6 @@ bool NifIStream::read( NifValue & val )
 		}
 	case NifValue::tByte:
 		{
-			val.val.u32 = 0;
 			*dataStream >> val.val.u08;
 			return (dataStream->status() == QDataStream::Ok);
 		}
@@ -86,7 +86,6 @@ bool NifIStream::read( NifValue & val )
 	case NifValue::tFlags:
 	case NifValue::tBlockTypeIndex:
 		{
-			val.val.u32 = 0;
 			*dataStream >> val.val.u16;
 			return (dataStream->status() == QDataStream::Ok);
 		}
@@ -109,6 +108,12 @@ bool NifIStream::read( NifValue & val )
 
 			return (dataStream->status() == QDataStream::Ok);
 		}
+	case NifValue::tInt64:
+	case NifValue::tUInt64:
+		{
+			*dataStream >> val.val.u64;
+			return (dataStream->status() == QDataStream::Ok);
+		}
 	case NifValue::tStringIndex:
 		{
 			*dataStream >> val.val.u32;
@@ -126,11 +131,13 @@ bool NifIStream::read( NifValue & val )
 		}
 	case NifValue::tFloat:
 		{
+			val.val.u64 = 0;
 			*dataStream >> val.val.f32;
 			return (dataStream->status() == QDataStream::Ok);
 		}
 	case NifValue::tHfloat:
 		{
+			val.val.u64 = 0;
 			uint16_t half;
 			*dataStream >> half;
 			val.val.u32 = half_to_float( half );
@@ -349,8 +356,22 @@ bool NifIStream::read( NifValue & val )
 			if ( c >= 80 )
 				return false;
 
+			quint32 version = 0;
+			// Support NIF versions without "Version" in header string
+			// Do for all files for now
+			//if ( c == GAMEBRYO_FF || c == NETIMMERSE_FF || c == NEOSTEAM_FF ) {
+			device->peek((char *)&version, 4);
+			// NeoSteam Hack
+			if (version == 0x08F35232)
+				version = 0x0A010000;
+			// Version didn't exist until NetImmerse 4.0
+			else if (version < 0x04000000)
+				version = 0;
+			//}
+
 			*static_cast<QString *>(val.val.data) = QString( string );
-			bool x = model->setHeaderString( QString( string ) );
+			bool x = model->setHeaderString( QString( string ), version );
+
 			init();
 			return x;
 		}
@@ -479,6 +500,11 @@ bool NifIStream::read( NifValue & val )
 	return false;
 }
 
+void NifIStream::reset()
+{
+	dataStream->device()->reset();
+}
+
 
 /*
 *  NifOStream
@@ -514,6 +540,9 @@ bool NifOStream::write( const NifValue & val )
 	case NifValue::tULittle32:
 	case NifValue::tStringIndex:
 		return device->write( (char *)&val.val.u32, 4 ) == 4;
+	case NifValue::tInt64:
+	case NifValue::tUInt64:
+		return device->write( (char *)&val.val.u64, 8 ) == 8;
 	case NifValue::tFileVersion:
 		{
 			if ( NifModel * mdl = static_cast<NifModel *>(const_cast<BaseModel *>(model)) ) {
@@ -827,6 +856,9 @@ int NifSStream::size( const NifValue & val )
 	case NifValue::tUpLink:
 	case NifValue::tFloat:
 		return 4;
+	case NifValue::tInt64:
+	case NifValue::tUInt64:
+		return 8;
 	case NifValue::tHfloat:
 		return 2;
 	case NifValue::tByteVector3:
